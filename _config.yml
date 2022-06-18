@@ -16,11 +16,11 @@ minimal_mistakes_skin: "default" # "air", "aqua", "contrast", "dark", "dirt", "n
 
 # Site Settings
 locale: "ko"
-title: "공부 중인 개발자"
+title: "archive of alexuhn"
 title_separator: "-"
 subtitle: # site tagline that appears below site title in masthead
 name: "alexuh"
-description: "공부 중인 개발자"
+description: "archive of alexuhn"
 url: "https://alexuhn.github.io"
 baseurl: # the subpath of your site, e.g. "/blog"
 repository: "alexuhn/alexuhn.github.io"

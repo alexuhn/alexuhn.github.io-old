@@ -1,8 +1,8 @@
 # main links
 main:
-  - title: "카테고리"
+  - title: "categories"
     url: /categories/
-  - title: "태그"
+  - title: "tags"
     url: /tags/
   # - title: "Quick-Start Guide"
   #   url: https://mmistakes.github.io/minimal-mistakes/docs/quick-start-guide/
