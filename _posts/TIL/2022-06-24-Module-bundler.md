@@ -5,10 +5,6 @@ categories:
   - TIL
 tags:
   - JavaScript
-
-toc: true
-toc_sticky: true
-toc_label: "목차"
 ---
 
 > 본 글은 [<What is module bundler and how does it work?>](https://lihautan.com/what-is-module-bundler-and-how-does-it-work/)을 바탕으로 작성되었다.

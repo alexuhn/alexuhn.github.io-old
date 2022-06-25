@@ -7,10 +7,6 @@ tags:
   - JavaScript
 
 last_modified_at: 2022-03-19
-
-toc: true
-toc_sticky: true
-toc_label: "목차"
 ---
 
 # this

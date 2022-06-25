@@ -7,10 +7,6 @@ tags:
   - Web
 
 last_modified_at: 2022-03-13
-
-toc: true
-toc_sticky: true
-toc_label: "목차"
 ---
 
 # Cookie
