@@ -16,11 +16,11 @@ minimal_mistakes_skin: "default" # "air", "aqua", "contrast", "dark", "dirt", "n
 
 # Site Settings
 locale: "ko"
-title: "archive of alexuhn"
+title: "개발 공부 정리 노트"
 title_separator: "-"
 subtitle: # site tagline that appears below site title in masthead
 name: "alexuh"
-description: "archive of alexuhn"
+description: "개발 공부를 하며 작성한 정리 노트를 기록합니다."
 url: "https://alexuhn.github.io"
 baseurl: # the subpath of your site, e.g. "/blog"
 repository: "alexuhn/alexuhn.github.io"
@@ -103,9 +103,9 @@ analytics:
 
 # Site Author
 author:
-  name: "alexuh"
+  name: # "alexuh"
   avatar: "/assets/images/bio-photo.png"
-  bio: ""
+  bio: "검증된 소스를 인용하기 위해 최선을 다합니다."
   location: "Republic of Korea"
   email: # "alexuhyun@gmail.com"
   links:
