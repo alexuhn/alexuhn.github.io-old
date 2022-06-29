@@ -171,6 +171,11 @@ hr {
 
 /* lists */
 
+// 리스트의 마진 제거
+ul {
+  margin: 0;
+}
+
 ul li,
 ol li {
   margin-bottom: 0.5em;
