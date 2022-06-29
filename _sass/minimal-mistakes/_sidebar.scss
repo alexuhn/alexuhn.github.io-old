@@ -180,6 +180,9 @@
 .author__bio {
   margin: 0;
 
+  // bio 최대 넓이 설정
+  max-width: 160px;
+
   @include breakpoint($large) {
     margin-top: 10px;
     margin-bottom: 20px;
@@ -216,7 +219,7 @@
 
     &:before {
       @supports (pointer-events: none) {
-        content: '';
+        content: "";
         position: fixed;
         top: 0;
         left: 0;
@@ -350,4 +353,3 @@
     margin-right: initial;
   }
 }
-
