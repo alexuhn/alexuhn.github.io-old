@@ -48,7 +48,7 @@ tags:
 ## Atomicity
 
 - Atomic 작업은 어떠한 context 안에서 indivisible 하거나 uninterruptible 하다는 것이다.
-- Context의 정의는 중요하다. 어떤 process의 context 내에서 atomic한 작업이 OS의 context 내에서는 atomic하지 않을 수 있고, 어떤 OS의 context 내에서는 atomic한 작업이 application의 context 내에서는 atomic하지 않을 수 있다. 따라서 atomicity를 생각할 때는 먼저 어느 context, 어느 scope 내에서 이 작업이 atomic하다는 건지 정의해야 한다.
+- Context의 정의는 중요하다. 어떤 process의 context 내에서 atomic한 작업이 OS의 context 내에서는 atomic하지 않을 수 있고, 어떤 OS의 context 내에서는 atomic한 작업이 application의 context 내에서는 atomic하지 않을 수 있다. <br/>따라서 atomicity를 생각할 때는 먼저 어느 context, 어느 scope 내에서 이 작업이 atomic하다는 건지 정의해야 한다.
 - Atomic한 작업 여러 개를 묶어놓는다고 더 큰 atomic한 작업이 되지는 않는다.
 - 동시성 프로그래밍에서 어떤 작업이 atomic하다면, concurrent context 내에서 해당 작업은 안전해진다.
     - 동시성 작업이 없는 context를 갖는 코드는 그 context 내에서 atomic하다. 만약 `i++` 코드가 작성되어 있지만 `i`가 외부에 노출되지 않은 goroutine이라면, 이 또한 그 context 내에서 atomic하다.
@@ -262,5 +262,57 @@ wg.Wait()
     
     - 공유된 `sharedLock`을 `greedyWorker`가 더 많이 점유하고 더 높은 성능을 냈다.
 - Starvation은 CPU, 메모리, 파일, 데이터베이스 등 공유될 수 있는 자원만 있다면 발생할 수 있다.
-- 위 코드의 `politeWorker` 처럼 memory access synchronization을 적용하는 건 비용이 많이 든다. 그렇다고 비용 감소를 위해 `greedyWorker` 처럼 critical section을 확장시키면 starvation이 생긴다. 
+- 위 코드의 `politeWorker` 처럼 memory access synchronization을 적용하는 건 비용이 많이 든다. 그렇다고 비용 감소를 위해 `greedyWorker` 처럼 critical section을 확장시키면 starvation이 생긴다. <br/>
 따라서 둘 사이에 균형을 잡아야 하며, 일반적으로 작은 critical section을 이후 확장하는 것이 그 반대 작업보다 쉽기 때문에 저자는 critical section에만 memory access synchronization을 적용하는 것을 추천한다.
+
+## Determining Concurrency Safety
+
+```go
+// CalculatePi calculates digits of Pi between the begin and end
+// place.
+func CalculatePi(begin, end int64, pi *Pi)
+```
+
+위 코드를 보고 세 가지 질문을 할 수 있다.
+
+- 어떻게 쓰라는 거지?
+- 내가 알아서 concurrent하게 이 함수를 써야 하나?
+- `Pi`에 대해서 내가 memory access synchronization을 적용해야 하나? 아니면 `Pi` 내부에서 처리되는 건가?
+
+이러한 질문이 들지 않도록 주석을 잘 달아주자.
+
+```go
+// CalculatePi calculates digits of Pi between the begin and end
+// place.
+//
+// Internally, CalculatePi will create FLOOR((end-begin)/2) concurrent
+// processes which recursively call CalculatePi. Synchronization of
+// writes to pi are handled internally by the Pi struct.
+func CalculatePi(begin, end int64, pi *Pi)
+```
+
+동시성이 포함된 코드를 작성할 때에는 자세하게 주석을 달아 다음과 같은 질문이 나오지 않는 게 좋다.
+
+- 누가 동시성을 담당하는 거지?
+- Concurrency primitives가 어떻게 구성된 거지?
+- Memory access synchronization은 누가 담당하고 있지?
+
+아니면 함수형 프로그래밍 방식을 채택해 side effect를 제거하여 함수를 더 분명하게 만들 수도 있다.
+
+```go
+func CalculatePi(begin, end int64) []uint
+```
+
+Memory access synchronization 문제는 해결되었지만 아직 함수가 동시성을 가졌는지는 분명하지 않다.
+
+채널을 사용하여 이 함수가 동시성을 갖는다는 사실을 더 명확하게 할 수 있다.
+
+```go
+func CalculatePi(begin, end int64) <-chan uint
+```
+
+하지만 함수가 더 명확해질수록 성능은 더 떨어질 수 있다. 둘 사이의 균형을 잘 맞추어야 한다.
+
+# Simplicity in the Face of Complexity
+
+Go의 concurrency primitives를 통해 우리는 좋은 성능과 명확성을 가질 수 있다.
