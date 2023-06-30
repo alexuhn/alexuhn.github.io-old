@@ -50,4 +50,39 @@ tags:
 - Go에선 memory access synchronization 방식을 따르는 코드 작성 또한 가능하다.
     - `sync`와 같은 패키지를 사용해 lock이나 pool을 구현할 수 있다.
 - 하지만 Go는 `sync.Mutex`와 같은 primitive 대신 CSP 스타일을 더 권장한다.
-- 그럼 애초에 memory access synchronization primitive는 왜 만들었고 사람들은 왜 이 방법을 더 많이 쓰냐? 정말 혼란스럽다! 무엇을 쓸 지 어떻게 결정을 내려야 할까?
+- 그럼 애초에 memory access synchronization primitive는 왜 만들었고 사람들은 왜 이 방법을 더 많이 쓰냐? 정말 혼란스럽다! 무엇을 쓸지 어떻게 결정을 내려야 할까?
+
+![Decisiong tree]({{ site.url }}{{ site.baseurl }}/assets/images/posts/Concurrency_in_Go/1.png){: .align-center}
+이렇게 결정해 보자.
+
+1. Is it a performance-critical section?
+    1. 성능때문에 무조건 mutex 쓰란 소리가 아니다.
+    2. 프로그램에서 한 부분이 유난히 느려 bottleneck이 발생한다면 memory access synchronization primitives를 쓰는 게 도움이 될 수 있다. 
+    3. 채널도 내부적으로 memory access synchronization primitives를 쓰기 때문에 더 느릴 수 있다. 그런데 애초에 프로그램을 리팩토링해야하는 건 아닐까?
+2. Are you trying to transfer ownership of data?
+    1. 만약 어떤 producer 코드가 결과를 생성하고 이를 다른 코드로 넘긴다면 이는 데이터 소유권을 넘기는 과정이다.
+    2. 데이터는 한 concurrent context만 소유권을 갖고 있어야 안전하다. 
+    3. 채널을 사용하여 데이터 소유권을 넘길 수 있다.
+3. Are you trying to guard internal state of a struct?
+    1. Memory access synchronization primitives를 사용하면 critical section을 호출자로부터 숨길 수 있다.
+        
+        ```go
+        type Counter struct {
+        		mu sync.Mutex
+        		value int
+        }
+        func (c *Counter) Increment() {
+        		c.mu.Lock()
+        		defer c.mu.Unlock()
+        		c.value++
+        }
+        ```
+        
+4. Are you trying to coordinate multiple pieces of logic?
+    1. 여기저기 lock이 흩뿌려져 있는 건 악몽이지만 채널은 그래도 된다.
+    2. 만약 primitives를 사용 중인데 deadlock이나 race가 계속 발생한다면 채널로 교체하는 것도 좋다.
+
+일반적으로 동시성 프로그램에 사용되는 패턴은 접어두자. Go에서는 그다지 유용하지 않다.
+
+Go에서 동시성은 단순하게, 가능하면 채널을 써서, goroutine을 마음껏 이용하며 다루자.
+
