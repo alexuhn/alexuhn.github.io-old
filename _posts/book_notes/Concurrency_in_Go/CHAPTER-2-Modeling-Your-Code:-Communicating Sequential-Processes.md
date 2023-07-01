@@ -1,6 +1,6 @@
 ---
 title: "[Concurrency in Go] CHAPTER 2. Modeling Your Code: Communicating Sequential Processes"
-excerpt: "CSP를 이용한 동시성 코드 작성"
+excerpt: "CSP와 memory access synchronization"
 categories:
   - book_notes
 tags:
