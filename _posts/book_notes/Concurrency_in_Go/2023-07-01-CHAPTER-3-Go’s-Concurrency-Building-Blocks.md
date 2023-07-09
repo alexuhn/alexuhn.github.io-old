@@ -286,10 +286,8 @@ tags:
     - 미리 `Pool`을 이용해 connection을 생성해 놓았기 때문에(warming a cache) 더 빠르다.
         <div class="notice--primary" markdown="1">
         🤔 미리 connection을 생성해 놓아서 시간을 절약할 수 있는 거라면 굳이 `Pool`을 쓰지 않아도 되는 거 아닌가?
-        </div>
-        <div class="notice--primary" markdown="1">
         💡 ChatGPT 답변
-          
+        <br/>
         가능하지만 `Pool`을 사용했을 때의 장점이 있다.
         
         - `Pool`을 사용하면 자동으로 connection을 재사용할 수 있다.
