@@ -1,5 +1,5 @@
 ---
-title: "[Concurrency in Go] CHAPTER 1. An Introduction to Concurrency"
+title: "CHAPTER 1. An Introduction to Concurrency"
 excerpt: "Concurrency의 등장 배경과 문제점, 어떻게 하면 안전하게 동시성 코드를 작성할 수 있는지에 대하여"
 categories:
   - book_notes
