@@ -299,9 +299,9 @@ tags:
         </div>
         
 
-## Channels
+# Channels
 
-### 양방향 채널, 단방향 채널
+## 양방향 채널, 단방향 채널
 
 - 값을 읽거나 쓸 수 있는 양방향 채널 선언
     
@@ -365,7 +365,7 @@ tags:
     ```
     
 
-### Blocking
+## Blocking
 
 - 꽉 찬 채널에 값을 쓰려면 빌 때까지 기다려야 한다 ⇒ blocking
 - 빈 채널에서 값을 읽으려면 값이 들어올 때까지 기다려야 한다 ⇒ blocking
@@ -440,7 +440,7 @@ close(valueStream)
     
     - 고루틴은 `<-begin`에서 기다리다가 `close(begin)`가 호출되면 다음으로 넘어간다.
 
-### 채널에 capacity를 할당한 buffered 채널
+## 채널에 capacity를 할당한 buffered 채널
 
 - 채널을 읽는 작업이 없어도 고루틴은 capacity만큼 쓰기가 가능하다.
     
@@ -452,7 +452,7 @@ close(valueStream)
 - Unbuffered 채널은 capacity가 0인 buffered 채널이다.
 - Buffered 채널은 잘못 사용하면 deadlock이 발생하기 쉽다.
 
-### `nil` 채널
+## `nil` 채널
 
 - 채널의 기본값
 - `nil` 채널을 사용하지 않도록 주의해야 한다.
@@ -478,7 +478,7 @@ close(dataStream)
 // panic: close of nil channel
 ```
 
-### 정리
+## 정리
 
 | Operation | 채널 상태 | 결과 |
 | --- | --- | --- |
