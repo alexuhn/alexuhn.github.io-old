@@ -299,7 +299,9 @@ tags:
         </div>
         
 
-# Channels
+## Channels
+
+### 양방향 채널, 단방향 채널
 
 - 값을 읽거나 쓸 수 있는 양방향 채널 선언
     
@@ -362,41 +364,44 @@ tags:
     fmt.Println(<-stringStream) // <- 채널
     ```
     
-- 채널은 blocking 작업이다.
-    - 꽉 찬 채널에 값을 쓰려면 빌 때까지 기다려야 한다.
-    - 빈 채널에서 값을 읽으려면 값이 들어올 때까지 기다려야 한다.
-    - 따라서 잘못 쓰면 deadlock이 발생한다.
-        
-        ```go
-        stringStream := make(chan string)
-        go func() {
-        	if 0 != 1 {
-        		return
-        	}
-        	stringStream <- "Hello channels!" // 도달 불가능
-        }()
-        fmt.Println(<-stringStream)
-        
-        // fatal error: all goroutines are asleep - deadlock!
-        ```
-        
-- 채널 닫기
+
+### Blocking
+
+- 꽉 찬 채널에 값을 쓰려면 빌 때까지 기다려야 한다 ⇒ blocking
+- 빈 채널에서 값을 읽으려면 값이 들어올 때까지 기다려야 한다 ⇒ blocking
+- 따라서 잘못 쓰면 deadlock이 발생한다.
     
     ```go
-    valueStream := make(chan interface{})
-    close(valueStream)
+    stringStream := make(chan string)
+    go func() {
+    	if 0 != 1 {
+    		return
+    	}
+    	stringStream <- "Hello channels!" // 도달 불가능
+    }()
+    fmt.Println(<-stringStream)
+    
+    // fatal error: all goroutines are asleep - deadlock!
     ```
     
-    - 흥미롭게도 닫힌 채널에서 값을 읽을 수 있다. 
-    값을 읽을 때 두 번째 반환 값을 통해 채널이 닫혔는지 알 수 있다.
-        
-        ```go
-        intStream := make(chan int)
-        close(intStream)
-        integer, ok := <- intStream
-        fmt.Printf("(%v): %v", ok, integer) // (false): 0
-        ```
-        
+
+### 채널 닫기
+
+```go
+valueStream := make(chan interface{})
+close(valueStream)
+```
+
+- 흥미롭게도 닫힌 채널에서 값을 읽을 수 있다. 
+값을 읽을 때 두 번째 반환 값을 통해 채널이 닫혔는지 알 수 있다.
+    
+    ```go
+    intStream := make(chan int)
+    close(intStream)
+    integer, ok := <- intStream
+    fmt.Printf("(%v): %v", ok, integer) // (false): 0
+    ```
+    
 - for loop에서 채널을 읽을 수 있다. 
 채널이 닫힐 때까지 for loop가 돌아간다.
     
@@ -434,3 +439,61 @@ tags:
     ```
     
     - 고루틴은 `<-begin`에서 기다리다가 `close(begin)`가 호출되면 다음으로 넘어간다.
+
+### 채널에 capacity를 할당한 buffered 채널
+
+- 채널을 읽는 작업이 없어도 고루틴은 capacity만큼 쓰기가 가능하다.
+    
+    ```go
+    var dataStream chan interface{}
+    dataStream = make(chan interface{}, 4)
+    ```
+    
+- Unbuffered 채널은 capacity가 0인 buffered 채널이다.
+- Buffered 채널은 잘못 사용하면 deadlock이 발생하기 쉽다.
+
+### `nil` 채널
+
+- 채널의 기본값
+- `nil` 채널을 사용하지 않도록 주의해야 한다.
+
+```go
+var dataStream chan interface{}
+<-dataStream
+
+// fatal error: all goroutines are asleep - deadlock!
+```
+
+```go
+var dataStream chan interface{}
+dataStream <- struct{}{}
+
+// fatal error: all goroutines are asleep - deadlock!
+```
+
+```go
+var dataStream chan interface{}
+close(dataStream)
+
+// panic: close of nil channel
+```
+
+### 정리
+
+| Operation | 채널 상태 | 결과 |
+| --- | --- | --- |
+| 읽기 | nil | Block |
+|  | 열려있고 값이 존재 | 값 |
+|  | 열려있고 비어 있음 | Block |
+|  | 닫혀있음 | 기본값, false |
+|  | 쓰기 전용 | Compilation Error |
+| 쓰기 | nil | Block |
+|  | 열려있고 꽉 참 | Block |
+|  | 열려있고 꽉 차지 않음 | 쓰는 값 |
+|  | 닫혀있음 | panic |
+|  | 읽기 전용 | Compilation Error |
+| 닫기 | nil | panic |
+|  | 열려있고 값이 존재 | 채널을 닫음<br/>채널이 빌 때까지 값을 읽을 수 있음  |
+|  | 열려있고 비어 있음 | 채널을 닫음 |
+|  | 닫혀있음 | panic |
+|  | 읽기 전용 | Compilation Error |
