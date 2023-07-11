@@ -497,3 +497,127 @@ close(dataStream)
 |  | 열려있고 비어 있음 | 채널을 닫음 |
 |  | 닫혀있음 | panic |
 |  | 읽기 전용 | Compilation Error |
+
+## 안전하게 채널 사용하기
+
+안전한 채널 사용을 위해서 채널을 소유한 고루틴과 소비하는 고루틴을 나누는 걸 추천한다.
+
+```go
+chanOwner := func() <-chan int {
+	resultStream := make(chan int, 5) // 채널 소유자
+	go func() {
+		defer close(resultStream)
+		for i := 0; i <= 5; i++ {
+			resultStream <- i
+		}
+	}()
+	return resultStream
+}
+
+resultStream := chanOwner()
+for result := range resultStream {
+	fmt.Printf("Received: %d\n", result)
+}
+fmt.Println("Done receiving!")
+```
+
+- 채널 소유 고루틴이 하는 작업
+    - 채널을 instantiate 한다.
+    - 채널에 쓰거나 소유권을 넘긴다.
+    - 채널을 닫는다.
+    - 위 세 동작을 캡슐화하여 reader 채널에 넘긴다.
+- 채널 소비 고루틴이 하는 작업
+    - 채널이 닫혔는지 확인한다.
+    - Blocking을 잘 다룬다.
+
+# The `select` Statement
+
+`select`문은 각 케이스를 동시에 살펴보고 만약 어떤 채널도 준비되지 않았다면 거기서 `select`문은 block 된다.
+
+## 여러 채널에서 동시에 읽을 수 있는 경우
+
+```go
+c1 := make(chan interface{}); close(c1)
+c2 := make(chan interface{}); close(c2)
+
+var c1Count, c2Count int
+for i := 1000; i >= 0; i-- {
+	select {
+	case <-c1:
+		c1Count++
+	case <-c2:
+		c2Count++
+	}
+}
+
+fmt.Printf("c1Count: %d\nc2Count: %d\n", c1Count, c2Count)
+
+// c1Count: 507
+// c2Count: 494
+```
+
+케이스는 동일한 확률로 선택된다.
+
+## 어떤 채널에서도 읽을 수 없는 경우
+
+```go
+var c <-chan int
+select {
+case <-c:
+case <-time.After(1 * time.Second):
+	fmt.Println("Timed out.")
+}
+```
+
+무한히 기다릴 수 없으니 `time` package를 잘 사용하자.
+
+## `default`
+
+```go
+start := time.Now()
+var c1, c2 <-chan int
+select {
+case <-c1:
+case <-c2:
+default:
+	fmt.Printf("In default after %v\n\n", time.Since(start))
+}
+```
+
+- 어떤 채널에서도 읽을 수 없을 때 해야 할 작업을 할당할 수 있다.
+- `select` 블락이 blocking하지 않도록 방지할 수 있다.
+- `for-select` loop로 자주 사용된다.
+    
+    ```go
+    done := make(chan interface{})
+    	go func() {
+    	time.Sleep(5*time.Second)
+    	close(done)
+    }()
+    
+    workCounter := 0
+    loop:
+    for {
+    	select {
+    	case <-done:
+    		break loop
+    	default:
+    	}
+    
+    	// Simulate work
+    	workCounter++
+    	time.Sleep(1*time.Second)
+    }
+    fmt.Printf("Achieved %v cycles of work before signalled to stop.\n", workCounter)
+    
+    // Achieved 5 cycles of work before signalled to stop.
+    ```
+    
+
+## 빈 `select`문
+
+```go
+select {}
+```
+
+영원히 block 한다.
