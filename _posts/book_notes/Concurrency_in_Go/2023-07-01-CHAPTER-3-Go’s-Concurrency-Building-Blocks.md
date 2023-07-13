@@ -621,3 +621,13 @@ select {}
 ```
 
 영원히 block 한다.
+
+
+# The GOMAXPROCS Lever
+
+```go
+runtime.GOMAXPROCS(runtime.NumCPU())
+```
+
+- Work queue를 호스팅하는 OS 스레드 수를 정할 때 사용한다.
+- 하지만 이 값을 바꾸는 것은 좋지 않다. 일부러 값을 높여 race condition을 테스트하는 경우와 같은 게 아닌 이상 안전하지 않다.
