@@ -283,3 +283,28 @@ for result := range checkStatus(done, urls...) {
 // error: Get "b": unsupported protocol scheme ""
 // Too many errors, breaking!
 ```
+
+# Pipelines
+
+- 파이프라인은 여러 스테이지로 구성되고, 각 스테이지에 관심사를 분리해 놓을 수 있다.
+- 스테이지는 데이터를 받아 작업을 하고 다시 데이터를 내놓는다.
+- 스테이지가 하는 작업의 종류
+    - Batch process: 데이터를 받아 한꺼번에 다시 내놓는 작업
+        
+        ```go
+        ints := []int{1, 2, 3, 4}
+        for _, v := range multiply(add(multiply(ints, 2), 1), 2) {
+        	fmt.Println(v)
+        }
+        ```
+        
+    - Stream process: 데이터를 받아 하나씩 다시 내놓는 작업
+        
+        ```go
+        ints := []int{1, 2, 3, 4}
+        for _, v := range ints {
+        	fmt.Println(multiply(add(multiply(v, 2), 1), 2))
+        }
+        ```
+        
+        - `range`가 데이터를 먹여줘야 하고, loop 안에서 계속 함수 호출도 하며 concurrent하게 작성하기도 어렵다.
