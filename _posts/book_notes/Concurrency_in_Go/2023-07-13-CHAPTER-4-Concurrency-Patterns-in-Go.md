@@ -308,3 +308,212 @@ for result := range checkStatus(done, urls...) {
         ```
         
         - `range`가 데이터를 먹여줘야 하고, loop 안에서 계속 함수 호출도 하며 concurrent하게 작성하기도 어렵다.
+
+## Best Practices for Constructing Pipelines
+
+스테이지가 block되더라도 채널을 닫아 이를 unblock할 수 있도록 해야 한다.
+
+```go
+select {
+case <-done:
+	return
+case ...:
+}
+```
+
+### 예시
+
+```go
+// Date를 채널로 변환
+generator := func(done <-chan interface{}, integers ...int) <-chan int {
+	intStream := make(chan int)
+	go func() {
+		defer close(intStream)
+		for _, i := range integers {
+			select {
+			case <-done:
+				return
+			case intStream <- i:
+			}
+		}
+	}()
+	return intStream
+}
+
+multiply := func(
+	done <-chan interface{},
+	intStream <-chan int,
+	multiplier int,
+) <-chan int {
+	multipliedStream := make(chan int)
+	go func() {
+		defer close(multipliedStream)
+		for i := range intStream {
+			select {
+			case <-done:
+				return
+			case multipliedStream <- i * multiplier:
+			}
+		}
+	}()
+	return multipliedStream
+}
+
+add := func(
+	done <-chan interface{},
+	intStream <-chan int,
+	additive int,
+) <-chan int {
+	addedStream := make(chan int)
+	go func() {
+		defer close(addedStream)
+		for i := range intStream {
+			select {
+			case <-done:
+				return
+			case addedStream <- i + additive:
+			}
+		}
+	}()
+	return addedStream
+}
+
+// 고루틴 leak 방지 & 종료 신호
+done := make(chan interface{})
+defer close(done)
+
+intStream := generator(done, 1, 2, 3, 4)
+pipeline := multiply(done, add(done, multiply(done, intStream, 2), 1), 2)
+
+for v := range pipeline {
+	fmt.Println(v)
+}
+```
+
+## Some Handy Generators
+
+```go
+// 주어진 values를 무한히 반복하는 stream 생성하는 스테이지
+repeat := func(
+	done <-chan interface{},
+	values ...interface{},
+) <-chan interface{} {
+	valueStream := make(chan interface{})
+	go func() {
+		defer close(valueStream)
+		for {
+			for _, v := range values {
+				select {
+				case <-done:
+					return
+				case valueStream <- v:
+				}
+			}
+		}
+	}()
+	return valueStream
+}
+
+// valueStream에서 num 개 만큼만 가져오는 스테이지
+take := func(
+	done <-chan interface{},
+	valueStream <-chan interface{},
+	num int,
+) <-chan interface{} {
+	takeStream := make(chan interface{})
+	go func() {
+		defer close(takeStream)
+		for i := 0; i < num; i++ {
+			select {
+			case <-done:
+				return
+			case takeStream <- <-valueStream:
+			}
+		}
+	}()
+	return takeStream
+}
+
+done := make(chan interface{})
+defer close(done)
+
+for num := range take(done, repeat(done, 1), 10) {
+	fmt.Printf("%v ", num)
+}
+
+// 1 1 1 1 1 1 1 1 1 1
+```
+
+```go
+take := func(
+	done <-chan interface{},
+	valueStream <-chan interface{},
+	num int,
+) <-chan interface{} {
+	takeStream := make(chan interface{})
+	go func() {
+		defer close(takeStream)
+		for i := 0; i < num; i++ {
+			select {
+			case <-done:
+				return
+			case takeStream <- <-valueStream:
+			}
+		}
+	}()
+	return takeStream
+}
+
+repeat := func(
+	done <-chan interface{},
+	values ...interface{},
+) <-chan interface{} {
+	valueStream := make(chan interface{})
+	go func() {
+		defer close(valueStream)
+		for {
+			for _, v := range values {
+				select {
+				case <-done:
+					return
+				case valueStream <- v:
+				}
+			}
+		}
+	}()
+	return valueStream
+}
+
+// valueStream에서 받은 값을 string으로 전환하는 스테이지
+toString := func(
+	done <-chan interface{},
+	valueStream <-chan interface{},
+) <-chan string {
+	stringStream := make(chan string)
+	go func() {
+		defer close(stringStream)
+		for v := range valueStream {
+			select {
+			case <-done:
+				return
+			case stringStream <- v.(string):
+			}
+		}
+	}()
+	return stringStream
+}
+
+done := make(chan interface{})
+defer close(done)
+
+var message string
+for token := range toString(done, take(done, repeat(done, "I", "am."), 5)) {
+	message += token
+}
+
+fmt.Printf("message: %s...", message)
+
+// message: Iam.Iam.I...
+```
+
+- Go에서 `interface{}` 사용을 권장하진 않지만 목적에 따라 잘 사용하면 큰 성능 차이는 없다.
