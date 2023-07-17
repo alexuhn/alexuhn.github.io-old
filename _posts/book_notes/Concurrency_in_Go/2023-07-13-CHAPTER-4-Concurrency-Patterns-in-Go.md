@@ -517,3 +517,198 @@ fmt.Printf("message: %s...", message)
 ```
 
 - Go에서 `interface{}` 사용을 권장하진 않지만 목적에 따라 잘 사용하면 큰 성능 차이는 없다.
+
+# Fan-Out, Fan-In
+
+- Fan-Out, Fan-In이 무엇인가?
+    - Fan-Out: 여러 고루틴을 이용해 파이프라인에서 input을 다루는 프로세스
+    - Fan-In: 여러 결과를 하나의 채널로 합치는 프로세스
+- 어떤 스테이지에 쓰면 좋은가?
+    - 이전에 계산된 값에 의존하지 않아도 되는, 즉 순서에 영향받지 않는 경우
+    - 오래 걸리는 작업이 있는 경우
+
+## 예시
+
+```go
+rand := func() interface{} { return rand.Intn(50000000) }
+
+done := make(chan interface{})
+defer close(done)
+
+start := time.Now()
+
+randIntStream := toInt(done, repeatFn(done, rand))
+fmt.Println("Primes:")
+for prime := range take(done, primeFinder(done, randIntStream), 10) {
+	fmt.Printf("\t%d\n", prime)
+}
+
+fmt.Printf("Search took: %v", time.Since(start))
+
+// Primes:
+//	24941317
+//	36122539
+//	6410693
+//	10128161
+//	25511527
+//	2107939
+//	14004383
+// 	7190363
+//	45931967
+//	2393161
+// Search took: 23.437511647s
+```
+
+- `primeFinder`
+    - 수를 받아 그 수보다 작은 모든 수로 나눠보며 소수를 찾는다. 즉 매우 오래 걸린다.
+    - 스테이지 순서에 영향을 받지도 않는다.
+    - 따라서 fan-out에 적당하다.
+
+**Fan-Out**
+
+`NumCPU` 수만큼 고루틴을 늘려 속도를 증가시킬 수 있다.
+
+```go
+numFinders := runtime.NumCPU()
+finders := make([]<-chan int, numFinders)
+for i := 0; i < numFinders; i++ {
+	finders[i] = primeFinder(done, randIntStream)
+}
+```
+
+**Fan-In**
+
+늘어난 고루틴에서 오는 결과를 하나로 합쳐야 한다.
+
+```go
+fanIn := func(
+	done <-chan interface{},
+	channels ...<-chan interface{},
+) <-chan interface{} { 
+	// 모든 채널을 기다리기 위한 WaitGroup
+	var wg sync.WaitGroup 
+	multiplexedStream := make(chan interface{})
+
+	// 채널에서 값을 받아 multiplexedStream 채널로 전달
+	multiplex := func(c <-chan interface{}) { 
+		defer wg.Done()
+		for i := range c {
+			select {
+			case <-done:
+				return
+			case multiplexedStream <- i:
+			}
+		}
+	}
+
+	// Select from all the channels
+	wg.Add(len(channels))
+	for _, c := range channels {
+		go multiplex(c)
+	}
+
+	// Wait for all the reads to complete
+	go func() {
+		wg.Wait()
+		close(multiplexedStream)
+	}()
+
+	return multiplexedStream
+}
+```
+
+# The or-done-channel
+
+채널에서 값을 읽다가 중단하려면 아래와 같이 코드가 복잡해질 수 있다.
+
+```go
+loop:
+for {
+	select {
+	case <-done:
+		break loop
+	case maybeVal, ok := <-myChan:
+		if ok == false {
+			return // or maybe break from for
+		}
+		// Do something with val
+	}
+}
+```
+
+or-done 채널을 이용해 이를 읽기 쉽게 바꿀 수 있다.
+
+```go
+orDone := func(done, c <-chan interface{}) <-chan interface{} {
+	valStream := make(chan interface{})
+	go func() {
+		defer close(valStream)
+		for {
+			select {
+			case <-done:
+				return
+			case v, ok := <-c:
+				if ok == false {
+					return
+				}
+				select {
+				case valStream <- v:
+				case <-done:
+				}
+			}
+		}
+	}()
+	return valStream
+}
+
+for val := range orDone(done, myChan) {
+	// Do something with val
+}
+```
+
+# The tee-channel
+
+채널에서 받은 값을 두 곳으로 보낼 때가 있다.
+
+```go
+tee := func(
+	done <-chan interface{},
+	in <-chan interface{},
+) (_, _ <-chan interface{}) {
+	out1 := make(chan interface{})
+	out2 := make(chan interface{})
+	go func() {
+	defer close(out1)
+	defer close(out2)
+	for val := range orDone(done, in) {
+		var out1, out2 = out1, out2
+		// 두 채널 중 한 곳에서 값을 받으면 nil이 되므로
+		// 무조건 두 채널 모두 값을 받을 수 있게 됨
+		for i := 0; i < 2; i++ {
+			select {
+			case <-done:
+			case out1<-val:
+				out1 = nil // 더 이상 값 받을 수 없음
+			case out2<-val:
+				out2 = nil // 더 이상 값 받을 수 없음
+			}
+		}
+	}
+	}()
+	return out1, out2
+}
+
+done := make(chan interface{})
+defer close(done)
+
+out1, out2 := tee(done, take(done, repeat(done, 1, 2), 4))
+
+for val1 := range out1 {
+	fmt.Printf("out1: %v, out2: %v\n", val1, <-out2)
+}
+
+// out1: 1, out2: 1
+// out1: 2, out2: 2
+// out1: 1, out2: 1
+// out1: 2, out2: 2
+```
