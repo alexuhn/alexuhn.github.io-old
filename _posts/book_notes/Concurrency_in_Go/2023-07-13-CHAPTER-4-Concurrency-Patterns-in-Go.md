@@ -712,3 +712,78 @@ for val1 := range out1 {
 // out1: 1, out2: 1
 // out1: 2, out2: 2
 ```
+
+# The bridge-channel
+
+채널의 채널에서 값을 가져올 때 사용할 수 있는 bridge channel을 만들 수 있다.
+
+```go
+bridge := func(
+	done <-chan interface{},
+	chanStream <-chan <-chan interface{},
+) <-chan interface{} {
+	valStream := make(chan interface{}) 
+	go func() {
+		defer close(valStream)
+		for { 
+			var stream <-chan interface{}
+			select {
+			case maybeStream, ok := <-chanStream:
+				if ok == false {
+					return
+				}
+				stream = maybeStream
+			case <-done:
+				return
+			}
+			for val := range orDone(done, stream) { 
+				select {
+				case valStream <- val:
+				case <-done:
+				}
+			}
+		}
+	}()
+	return valStream
+}
+```
+
+Bridge를 사용해 하나의 for 문으로 값을 가져올 수 있다.
+
+```go
+genVals := func() <-chan <-chan interface{} {
+	chanStream := make(chan (<-chan interface{}))
+	go func() {
+		defer close(chanStream)
+		for i := 0; i < 10; i++ {
+			stream := make(chan interface{}, 1)
+			stream <- i
+			close(stream)
+			chanStream <- stream
+		}
+	}()
+	return chanStream
+}
+```
+
+# Queuing
+
+Queuing은 프로그램의 속도를 올려주는 게 아니다. Blocking state에 놓인 스테이지의 소요 시간을 줄여주는 것이다. 따라서 모든 상황에서 항상 좋은 것은 아니다. 
+
+다음 두 상황에서는 queuing이 유용하다.
+
+- 파이프라인의 초입
+- Batch 작업이 매우 효율적인 스테이지
+
+이론적으로 Little’s Law를 통해 필요한 queue size를 계산할 수 있다.
+
+- 참고) [https://en.wikipedia.org/wiki/Little's_law](https://en.wikipedia.org/wiki/Little%27s_law)
+- 이 법칙은 안정적인 시스템 즉, 입력과 출력의 속도가 동일한 시스템에 적용할 수 있다.
+- 이 법칙에 따르면 queuing은 전체 시스템의 소요 시간을 줄이지 않으며, 오직 가장 느린 스테이지만큼만 빨라지게 한다.
+
+# The context Package
+
+`context` 패키지의 두 가지 주목적
+
+- Call-graph의 가지를 cancel 할 수 있는 API 제공
+- Call-graph에 데이터를 제공
