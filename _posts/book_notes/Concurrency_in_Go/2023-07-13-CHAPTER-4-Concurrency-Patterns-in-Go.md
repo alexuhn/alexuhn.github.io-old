@@ -784,6 +784,13 @@ Queuing은 프로그램의 속도를 올려주는 게 아니다. Blocking state�
 # The context Package
 
 `context` 패키지의 두 가지 주목적
-
 - Call-graph의 가지를 cancel 할 수 있는 API 제공
+    - `Context`를 받은 스테이지가 아닌, call-graph 상위 스테이지에서 이를 cancel 할 수 있다.
+    - 이때 `Context`를 `struct`와 같은 구조에 넣지 말고 함수의 인자로 넘기는 게 중요하다.
 - Call-graph에 데이터를 제공
+
+비어있는 `Context` 인스턴스를 만드는 두 가지 방법
+- `func Background() Context`
+    - 비어있는 `Context.TODO` 반환
+    - 어떤 `Context`가 올지 모를 때 사용하는 placeholder 역할
+- `func TODO() Context`
