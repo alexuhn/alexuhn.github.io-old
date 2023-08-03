@@ -784,12 +784,50 @@ Queuing은 프로그램의 속도를 올려주는 게 아니다. Blocking state�
 # The context Package
 
 `context` 패키지의 두 가지 주목적
+
 - Call-graph의 가지를 cancel 할 수 있는 API 제공
     - `Context`를 받은 스테이지가 아닌, call-graph 상위 스테이지에서 이를 cancel 할 수 있다.
     - 이때 `Context`를 `struct`와 같은 구조에 넣지 말고 함수의 인자로 넘기는 게 중요하다.
 - Call-graph에 데이터를 제공
+    - 어떤 데이터를 포함할지는 신중히 결정해야 하며, optional parameter나 mutable 데이터 등의 사용은 권장하지 않는다.
+    - 다른 패키지와의 충돌을 피하고자 커스텀 key type 생성이 권장된다.
+    새 커스텀 key type은 숨기고, value를 가져오기 위한 exported function을 만들자.
+        
+        ```go
+        type ctxKey int // 숨긴 custom key type
+        
+        const (
+        	ctxUserID ctxKey = iota
+        	ctxAuthToken
+        )
+        
+        // value를 가져오기 위한 exported functions
+        func UserID(c context.Context) string { 
+        	return c.Value(ctxUserID).(string)
+        }
+        
+        func AuthToken(c context.Context) string {
+        	return c.Value(ctxAuthToken).(string)
+        }
+        
+        func ProcessRequest(userID, authToken string) {
+        	ctx := context.WithValue(context.Background(), ctxUserID, userID)
+        	ctx = context.WithValue(ctx, ctxAuthToken, authToken)
+        	HandleResponse(ctx)
+        }
+        
+        func HandleResponse(ctx context.Context) {
+        	fmt.Printf(
+        		"handling response for %v (auth: %v)",
+        		UserID(ctx),
+        		AuthToken(ctx),
+        	) // handling response for jane (auth: abc123)
+        }
+        ```
+        
 
 비어있는 `Context` 인스턴스를 만드는 두 가지 방법
+
 - `func Background() Context`
     - 비어있는 `Context.TODO` 반환
     - 어떤 `Context`가 올지 모를 때 사용하는 placeholder 역할
