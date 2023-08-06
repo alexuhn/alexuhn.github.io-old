@@ -52,7 +52,7 @@ tags:
 - 하지만 Go는 `sync.Mutex`와 같은 primitive 대신 CSP 스타일을 더 권장한다.
 - 그럼 애초에 memory access synchronization primitive는 왜 만들었고 사람들은 왜 이 방법을 더 많이 쓰냐? 정말 혼란스럽다! 무엇을 쓸지 어떻게 결정을 내려야 할까?
 
-![Decisiong tree]({{ site.url }}{{ site.baseurl }}/assets/images/posts/Concurrency_in_Go/1.png){: .align-center}
+![Decisiong tree]({{ site.url }}{{ site.baseurl }}/assets/images/posts/book_notes/Concurrency_in_Go/1.png){: .align-center}
 이렇게 결정해 보자.
 
 1. Is it a performance-critical section?
