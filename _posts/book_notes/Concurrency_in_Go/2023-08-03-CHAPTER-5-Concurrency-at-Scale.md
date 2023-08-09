@@ -360,3 +360,7 @@ func (a *APIConnection) ResolveAddress(ctx context.Context) error {
 	return nil
 }
 ```
+
+# Healing Unhealthy Goroutines
+
+Heartbeats를 이용하면 제대로 작동하지 않는 고루틴을 찾을 수 있고, 이를 다시 정상 작동하게 만들 수 있다.
