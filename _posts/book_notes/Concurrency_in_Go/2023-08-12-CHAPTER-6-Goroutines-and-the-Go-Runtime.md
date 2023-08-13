@@ -127,4 +127,107 @@ fmt.Printf("fib(4) = %d", <-fib(4))
     
     | T1 call stack | T1 work deque | T2 call stack | T2 work deque |
     | --- | --- | --- | --- |
-    | print 3 |  |  |  |
+    | print `3` |  |  |  |
+
+## Stealing Tasks or Continuations?
+
+그래서 무엇을 큐에 넣고 뺏어야 하는가? Fork-join 모델에선 다음 두 선택지가 있다.
+
+1. Tasks
+    1. 고루틴은 task다.
+2. Continuations
+    1. 고루틴이 호출된 이후의 모든 것은 continuation이다.
+
+이전 예시에서는 고루틴 즉, task를 큐에 넣고 뺏었지만 사실 Go의 work-stealing 알고리즘은 continuation을 큐에 넣고 뺏는다. 이를 통해 join point에서 기다리는 횟수를 줄일 수 있다. 
+
+위 예시를 continuation을 적용해 다시 한번 살펴보자.
+
+1. 첫 고루틴인 main goroutine이 할당된다.
+    
+    
+    | T1 call stack | T1 work deque | T2 call stack | T2 work deque |
+    | --- | --- | --- | --- |
+    | main goroutine |  |  |  |
+2. `fib(4)`가 호출되고 T1 work deque tail에 main goroutine의 continuation이 할당된다.
+    
+    
+    | T1 call stack | T1 work deque | T2 call stack | T2 work deque |
+    | --- | --- | --- | --- |
+    | `fib(4)` | continuation of main goroutine |  |  |
+3. T2는 작업이 없으므로 T1 work deque head에서 continuation을 뺏어온다.
+    
+    
+    | T1 call stack | T1 work deque | T2 call stack | T2 work deque |
+    | --- | --- | --- | --- |
+    | `fib(4)` |  | continuation of main goroutine |  |
+4. `fib(4)`가 `fib(3)`를 호출해 바로 실행한다. `fib(4)`의 continuation은 deque tail에 할당된다.
+    
+    
+    | T1 call stack | T1 work deque | T2 call stack | T2 work deque |
+    | --- | --- | --- | --- |
+    | `fib(3)` | continuation of `fib(4)` | continuation of main goroutine |  |
+5. T2는main goroutine의 continuation을 실행할 수 없으므로 join point에서 기다려야 한다. 할 일이 없으므로 T1 work deque head에서 continuation을 뺏어온다.
+    
+    
+    | T1 call stack | T1 work deque | T2 call stack | T2 work deque |
+    | --- | --- | --- | --- |
+    | `fib(3)` |  | continuation of main goroutine<br>(join point) |  |
+    |  |  | continuation of `fib(4)` |  |
+6. T1의 `fib(3)`가 `fib(2)`을 호출해 실행시키고, `fib(3)`의 continuation이 deque tail에 할당된다.
+    
+    
+    | T1 call stack | T1 work deque | T2 call stack | T2 work deque |
+    | --- | --- | --- | --- |
+    | `fib(2)` | continuation of `fib(3)` | continuation of main goroutine<br>(join point) |  |
+    |  |  | continuation of `fib(4)` |  |
+7. T2의 `fib(4)`가 `fib(2)`을 호출해 실행시키고, `fib(4)`의 continuation이 deque tail에 할당된다.
+    
+    
+    | T1 call stack | T1 work deque | T2 call stack | T2 work deque |
+    | --- | --- | --- | --- |
+    | `fib(2)` | continuation of `fib(3)` | continuation of main goroutine<br>(join point) | continuation of `fib(4)` |
+    |  |  | `fib(2)` |  |
+8. T1과 T2에서 `fib(2)`는 `1`을 반환한다.
+    
+    
+    | T1 call stack | T1 work deque | T2 call stack | T2 work deque |
+    | --- | --- | --- | --- |
+    | return `1` | continuation of `fib(3)` | continuation of main goroutine<br>(join point) | continuation of `fib(4)` |
+    |  |  | return `1` |  |
+9. T1은 다시 할 게 없으므로 T1 work deque tail에서 continuation을 뺏어와 `fib(1)`을 실행한다.
+이때 task를 뺏을 때와 다르게 T1에서 `fib(3)`, `fib(2)`, `fib(1)`을 연속적으로 처리하게 된다.
+    
+    
+    | T1 call stack | T1 work deque | T2 call stack | T2 work deque |
+    | --- | --- | --- | --- |
+    | `fib(1)` |  | continuation of main goroutine<br>(join point) | continuation of `fib(4)` |
+    |  |  | return `1` |  |
+10. T2는 T2 work deque에서 continuation을 가져온다. 하지만 T1에서 아직 `fib(3)`이 처리 중이라 여기서 또한 할 게 없으므로 join point에서 기다린다.
+    
+    
+    | T1 call stack | T1 work deque | T2 call stack | T2 work deque |
+    | --- | --- | --- | --- |
+    | `fib(1)` |  | continuation of main goroutine<br>(join point) |  |
+    |  |  | `fib(4)`<br>(join point) |  |
+11. T1의 continuation of `fib(3)`은 작업이 완료되어 `2`를 반환한다.
+    
+    
+    | T1 call stack | T1 work deque | T2 call stack | T2 work deque |
+    | --- | --- | --- | --- |
+    | return `2` |  | continuation of main goroutine<br>(join point) |  |
+    |  |  | `fib(4)`<br>(join point) |  |
+12. T2의 continuation of `fib(4)`은 작업이 완료되어 `3`을 반환한다.
+    
+    
+    | T1 call stack | T1 work deque | T2 call stack | T2 work deque |
+    | --- | --- | --- | --- |
+    |  |  | continuation of main goroutine<br>(join point) |  |
+    |  |  | return `3` |  |
+13. T2의 continuation of main goroutine은 작업이 완료되어 `4`를 출력한다.
+    
+    
+    | T1 call stack | T1 work deque | T2 call stack | T2 work deque |
+    | --- | --- | --- | --- |
+    |  |  | print `3` |  |
+
+물론 이는 실제 Go의 알고리즘을 반영하지 못한다. Go 런타임은 모든 OS thread가 context(예시의 큐)를 다룰 수 있도록 최적화가 되어있다. 예를 들어 OS thread가 input/output 등으로 block 된다면 context를 분리하여 다른 thread가 처리할 수 있도록 하고 이후 unblock 된다면 context를 다시 뺏어갈 수 있도록 한다. 만약 이조차 불가능하다면 context의 고루틴을 global context에 두고 미래에 처리될 수 있도록 한다.
