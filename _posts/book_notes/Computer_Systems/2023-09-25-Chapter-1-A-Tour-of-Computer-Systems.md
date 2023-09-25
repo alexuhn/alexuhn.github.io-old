@@ -3,7 +3,7 @@ title: "Chapter 1: A Tour of Computer Systems"
 categories:
   - book_notes
 tags:
-  - Computer Systems: A Programmer's Perspective
+  - Computer Systems
 ---
 
 # 1.1 Information Is Bits + Context
