@@ -3,7 +3,7 @@ title: "Chapter 1: A Tour of Computer Systems"
 categories:
   - book_notes
 tags:
-  - Concurrency in Go
+  - Computer Systems: A Programmer's Perspective
 ---
 
 # 1.1 Information Is Bits + Context
